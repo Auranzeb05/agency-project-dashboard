@@ -1,0 +1,7 @@
+The hardest problem was keeping authorization consistent across ordinary API requests, live updates, and offline recovery. A role check alone does not establish whether a project manager owns a project or whether a developer is assigned to a particular task. The implementation applies those ownership predicates to task queries, activity history, notifications, and the audience selected for each live change.
+
+Task updates, activity records, and related notifications commit in one PostgreSQL transaction. Socket.IO uses WebSocket transport exclusively and private, server-selected user rooms. After an authorized change signal, the client refetches its scoped data. Developers who lose an assignment receive a content-free invalidation, and subsequent task or history requests are denied.
+
+On reconnection, a database query returns the latest 20 authorized events after the device's saved cursor. Event-producing transactions use an advisory lock so activity sequence order also follows commit order; otherwise a cursor could advance past an earlier transaction that had not yet committed. Optimistic task versions separately prevent stale edits from silently replacing newer work.
+
+The next improvement would be a transactional outbox with a retrying dispatcher. Database state already survives a failed socket delivery, but an outbox would close the gap between committing a change and publishing it. Shared presence and a Socket.IO adapter would then support multiple API instances.

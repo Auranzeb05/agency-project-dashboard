@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Run npm run setup first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup first}
+      POSTGRES_DB: ${POSTGRES_DB:-agency}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agency}
+      NODE_ENV: development
+      PORT: 4000
+    ports:
+      - '127.0.0.1:4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: [full]
+  web:
+    image: node:22-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+      - web_modules:/app/node_modules
+    command: sh -c "npm ci && npm run dev -w apps/web -- --host 0.0.0.0"
+    environment:
+      API_PROXY_TARGET: http://api:4000
+    ports:
+      - '127.0.0.1:5173:5173'
+    depends_on: [api]
+    profiles: [full]
+volumes:
+  postgres_data:
+  web_modules:
