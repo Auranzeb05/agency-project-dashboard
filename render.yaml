@@ -4,7 +4,7 @@ services:
   - type: web
     name: fieldwork-api
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -29,7 +29,7 @@ services:
         value: 'true'
 databases:
   - name: fieldwork-db
-    plan: basic-256mb
+    plan: free
     databaseName: fieldwork
     user: fieldwork
     ipAllowList: []
