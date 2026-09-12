@@ -29,7 +29,11 @@ test('admin can manage clients and projects; dialogs preserve keyboard access', 
   await page.getByRole('link', { name: 'Projects', exact: true }).click();
   await page.getByRole('button', { name: 'New project', exact: true }).click();
   await page.getByLabel('Project name').fill('Juniper — Launch');
-  await page.getByLabel('Client', { exact: true }).selectOption({ label: 'Juniper QA' });
+  const projectDialog = page.getByRole('dialog', { name: 'New project' });
+  const clientSelect = projectDialog.locator('select[name="client_id"]');
+
+  await expect(clientSelect).toBeVisible();
+  await clientSelect.selectOption({ label: 'Juniper QA' });
   await page.getByLabel('Project brief').fill('A focused launch workspace.');
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('heading', { name: 'Juniper — Launch' })).toBeVisible();

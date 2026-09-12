@@ -2006,3 +2006,29 @@ select {
   gap: 5px;
   text-decoration: underline;
 }
+
+/* Mobile page overflow containment */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app-shell,
+.main-shell,
+.main-content {
+  min-width: 0;
+}
+
+.app-shell {
+  overflow-x: hidden;
+}
+
+.table-scroll {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}

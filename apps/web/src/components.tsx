@@ -1,5 +1,5 @@
 import { ArrowUpRight, Inbox, LoaderCircle, X } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Activity, Priority, Status, Task } from './types';
 import { labels, statuses } from './types';
@@ -98,6 +98,7 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
@@ -114,6 +115,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       className={`modal ${wide ? 'wide' : ''}`}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
@@ -121,7 +123,7 @@ export function Modal({
     >
       <div className="modal-inner">
         <div className="modal-heading">
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}>
             <X size={20} />
           </button>
