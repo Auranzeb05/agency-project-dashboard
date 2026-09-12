@@ -1,14 +1,91 @@
 # Fieldwork
 
-A client project workspace for a small agency. Administrators see the whole operation, project managers manage their own projects, and developers see only their assigned work.
+> A secure, real-time project operations workspace for small agencies.
 
-Built with React, TypeScript, Express, PostgreSQL, Socket.IO, and node-cron.
+[![Verify application](https://github.com/Auranzeb05/agency-project-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Auranzeb05/agency-project-dashboard/actions/workflows/ci.yml)
+[![Live application](https://img.shields.io/badge/Live%20application-Vercel-111111?logo=vercel)](https://agency-project-dashboard.vercel.app)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
+Fieldwork brings client work, projects, tasks, activity, and team access into one focused workspace. Administrators can oversee the agency, project managers work within their own portfolio, and developers see only the tasks assigned to them. Every sensitive read and write is scoped again on the server.
+
+## Live demo
+
+- **Application:** [agency-project-dashboard.vercel.app](https://agency-project-dashboard.vercel.app)
+- **API health:** [fieldwork-api-bfyz.onrender.com/api/health](https://fieldwork-api-bfyz.onrender.com/api/health)
+- **Demo administrator:** `admin@fieldwork.test`
+- **Password:** provided privately with the submission
+
+> The API uses Render's free tier and can take approximately one minute to wake after a period of inactivity.
+
+## Product highlights
+
+- Role-aware dashboards for administrators, project managers, and developers
+- Client, project, user, and task management with server-enforced ownership rules
+- Task status, priority, assignee, due date, description, and immutable activity history
+- Live task, activity, notification, and presence updates over authenticated WebSockets
+- Persistent assignment and review notifications with individual and read-all actions
+- URL-based status, priority, and due-date filters that survive refresh and can be shared
+- Archived project history with restore support
+- Scheduled overdue detection independent of page visits
+- Optimistic concurrency control that prevents stale task edits from overwriting newer work
+- Responsive layouts, accessible dialogs, keyboard navigation, and recoverable error states
+
+## Roles and access
+
+| Role                | Workspace access                                                         |
+| ------------------- | ------------------------------------------------------------------------ |
+| **Administrator**   | Full operational view; manages clients, users, projects, and tasks       |
+| **Project manager** | Manages owned projects and their tasks; sees only relevant team activity |
+| **Developer**       | Sees assigned work and permitted project context; updates task progress  |
+
+Authorization is enforced by the API and SQL query scope. Hiding a control in the frontend is never treated as a security boundary.
+
+## Technology
+
+| Layer           | Stack                                                                     |
+| --------------- | ------------------------------------------------------------------------- |
+| Frontend        | React 19, TypeScript, Vite, React Router, TanStack Query                  |
+| Backend         | Node.js, Express, TypeScript, Zod                                         |
+| Database        | PostgreSQL 17 with explicit SQL migrations and indexed relational queries |
+| Real time       | Socket.IO using authenticated WebSocket-only connections                  |
+| Authentication  | Short-lived JWT access tokens and rotating HttpOnly refresh cookies       |
+| Background work | `node-cron` overdue-task scheduler                                        |
+| Testing         | Node test runner, real PostgreSQL integration tests, Playwright           |
+| Delivery        | GitHub Actions, Vercel, Render, Docker Compose                            |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser[React application] -->|HTTPS + JWT| API[Express API]
+    Browser <-->|Authenticated WebSocket| API
+    API -->|Parameterized SQL| DB[(PostgreSQL)]
+    Scheduler[Overdue scheduler] --> API
+```
+
+The frontend keeps access tokens in memory and sends the refresh token only as a secure HttpOnly cookie. The API owns authentication, authorization, validation, transactions, event creation, and notification delivery. PostgreSQL is the source of truth; live events accelerate the interface but never replace durable writes.
+
+### Reliability and data integrity
+
+- Refresh tokens rotate on use, and replay invalidates the associated session family.
+- Task rows carry versions; stale writes return `409 STALE_TASK`.
+- Mutations and their activity records commit in the same database transaction.
+- Reconnection catch-up restores the latest authorized events after a temporary disconnect.
+- Reassignment immediately changes task, history, and notification visibility.
+- SQL uses bound parameters, and ownership conditions remain explicit in repository queries.
 
 ## Run locally
 
-Requires Node.js 22+ and Docker with Compose. No cloud accounts are needed for local development.
+### Requirements
+
+- Node.js 22 or newer
+- Docker Desktop with Docker Compose
+
+### Setup
 
 ```bash
+git clone https://github.com/Auranzeb05/agency-project-dashboard.git
+cd agency-project-dashboard
 npm ci
 npm run setup
 docker compose up -d db
@@ -17,17 +94,21 @@ npm run db:seed
 npm run dev
 ```
 
-Open **http://localhost:5173**. The API runs on port 4000. `npm run setup` creates an ignored `.env` with different random JWT secrets, a database password, and a seed password. It never overwrites an existing `.env`.
+Open [http://localhost:5173](http://localhost:5173). The API listens on [http://localhost:4000](http://localhost:4000).
 
-If port 5432 already belongs to another PostgreSQL installation, use that database and update `DATABASE_URL`, or change the Compose port mapping and the URL together.
+`npm run setup` creates an ignored `.env` containing independent JWT secrets, a database password, and a seed password. It never overwrites an existing file. If PostgreSQL is still starting, wait for it before running migrations:
+
+```bash
+until docker compose exec -T db pg_isready -U agency -d agency; do sleep 1; done
+```
 
 ### Seed accounts
 
-Every seeded account uses the value of **`SEED_PASSWORD` in your local `.env`**. Credentials are deliberately absent from source control and the login screen.
+All seeded accounts use the `SEED_PASSWORD` value from the local `.env` file.
 
 | Role            | Email                  |
 | --------------- | ---------------------- |
-| Admin           | `admin@fieldwork.test` |
+| Administrator   | `admin@fieldwork.test` |
 | Project manager | `nisha@fieldwork.test` |
 | Project manager | `kabir@fieldwork.test` |
 | Developer       | `ravi@fieldwork.test`  |
@@ -35,9 +116,9 @@ Every seeded account uses the value of **`SEED_PASSWORD` in your local `.env`**.
 | Developer       | `arjun@fieldwork.test` |
 | Developer       | `sara@fieldwork.test`  |
 
-The seed creates 3 clients, 3 projects, 18 tasks in all four statuses, 6 overdue tasks, activity history, and assignment/review notifications. Nisha owns Atlas and Northline; Kabir owns Orbit. Ravi and Maya work on Nisha's projects; Arjun and Sara work on Kabir's. Seeding a database that already has users leaves its data intact.
+The seed creates three clients, three projects, 18 tasks across all workflow states, overdue work, activity history, and notifications. Seeding an already initialized database leaves existing user data intact.
 
-### All services in Docker
+### Run the complete stack in Docker
 
 ```bash
 npm run setup
@@ -45,52 +126,36 @@ docker compose --profile full up --build -d
 docker compose exec api node apps/api/dist/seed.js
 ```
 
-Open the same frontend URL. The API applies migrations at startup. `docker compose down` stops the services while keeping the database volume. Do not use `down -v` unless you intend to delete local data.
+Stop services without removing database data:
 
-## What is included
-
-- JWT access tokens in memory; rotating JWT refresh tokens in an HttpOnly cookie.
-- API authentication and role checks, plus project ownership and task-assignment checks on every data path.
-- Client, project, team, and task management; archived projects remain readable and can be restored.
-- Task status, priority, UTC due date, assignee, description, and immutable activity records.
-- Optimistic task versions: a stale edit returns `409 STALE_TASK` rather than overwriting a newer change.
-- WebSocket-only live updates and unique-user presence. Long-polling fallback is disabled on both ends.
-- Database catch-up for the latest 20 missed, authorized activity events.
-- Persistent assignment/review notifications, individual/read-all actions, and live unread badges.
-- Scheduled overdue detection, independent of page loads.
-- Role-specific dashboards, task pagination, and shareable status/priority/date filters.
-- Desktop and mobile layouts, keyboard-accessible dialogs, loading states, and errors with recovery actions.
-
-A filter URL looks like `/tasks?status=IN_REVIEW&priority=HIGH&due_from=2026-09-01&due_to=2026-09-30`. Project lists and task detail endpoints apply the same access rules as the dashboard.
-
-## Architecture
-
-```text
-apps/api/src/
-  app.ts           HTTP routes, validation, middleware, structured errors
-  auth.ts          Token issuance, refresh rotation, session validation
-  repository.ts    Scoped reads and shared query helpers
-  services.ts      Transactional changes and their business rules
-  realtime.ts      Private delivery, session revalidation, presence
-  index.ts         Server lifecycle and overdue schedule
-  migrate.ts       Ordered migrations with a database lock
-  seed.ts          Repeatable initial fixture creation
-apps/api/migrations/  PostgreSQL schema and indexes
-apps/web/src/
-  App.tsx          Sign-in and role-aware application shell
-  pages/           Overview, projects, tasks, activity, and management screens
-  api.ts           In-memory access token and refresh coordination
-  session.tsx      Authentication state, sockets, and reconnect catch-up
-  forms.tsx        Project, task, client, and user editors
-  components.tsx   Task table, activity list, dialogs, and common UI
-  types.ts         Frontend data contracts
+```bash
+docker compose down
 ```
 
-SQL uses bound parameters. Controllers do not assemble SQL. Explicit SQL keeps ownership conditions visible and makes relational constraints and query plans straightforward to review. React Query owns server state; component state holds only temporary UI concerns such as open dialogs. Filter state lives in the URL.
+Running `docker compose down -v` also deletes the PostgreSQL volume and should be used only when a full local reset is intended.
 
-Read [the architecture notes](docs/architecture.md) for schema relationships, index decisions, event ordering, and security boundaries. See [the API reference](docs/api.md) for routes and response shapes.
+## Environment variables
+
+The setup script creates safe local values automatically. Deployment values belong in the hosting provider, never in source control.
+
+| Variable             | Purpose                                      |
+| -------------------- | -------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string                 |
+| `JWT_ACCESS_SECRET`  | Access-token signing secret                  |
+| `JWT_REFRESH_SECRET` | Refresh-token signing secret                 |
+| `SEED_PASSWORD`      | Initial password for seeded demo accounts    |
+| `WEB_ORIGIN`         | Allowed frontend origin for CORS and cookies |
+| `COOKIE_SAME_SITE`   | Refresh-cookie cross-site policy             |
+| `TRUST_PROXY`        | Trusted proxy count for the deployed API     |
+| `JOBS_ENABLED`       | Enables scheduled overdue detection          |
+| `VITE_API_URL`       | Public browser-facing API origin             |
+| `VITE_SOCKET_URL`    | Public browser-facing Socket.IO origin       |
+
+Never place a password, database URL, or signing secret in a `VITE_` variable; Vite includes those values in the browser bundle.
 
 ## Verification
+
+### Static checks
 
 ```bash
 npm run typecheck
@@ -98,10 +163,11 @@ npm run build
 npm run format:check
 ```
 
-Integration tests require a **disposable database whose name ends in `_test`**. Set `NODE_ENV=test` and point `DATABASE_URL` at it. The test suite resets its schema; its guard prevents it from running against a normally named application database.
+### Integration and browser tests
+
+Tests require a disposable PostgreSQL database whose name ends in `_test`. The guard prevents destructive test setup against a normal application database.
 
 ```bash
-# Export a connection URL for your own disposable test database first.
 export NODE_ENV=test
 export DATABASE_URL='postgresql://USER:PASSWORD@localhost:5432/agency_test'
 npm test
@@ -110,25 +176,58 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The 12 integration tests cover authorization, tampered tokens, current database roles, role-scoped feeds, input validation, real WebSocket clients, unique presence, stale edits, overdue jobs, reassignment, missed-event catch-up, notification isolation, refresh replay, logout, archive/restore, and deactivation. Browser tests cover management workflows, multiple roles, filter reloads, cross-browser updates, notifications, mobile layout, and dialogs. GitHub Actions runs both suites against PostgreSQL 17 and retains browser results for seven days.
+The automated suite contains 12 backend integration tests and four end-to-end browser scenarios. It covers authorization boundaries, validation, token tampering and replay, session refresh, real WebSocket clients, presence, stale edits, reassignment, notifications, overdue jobs, archive/restore, filter persistence, mobile layout, and keyboard-accessible dialogs. GitHub Actions runs the full suite against PostgreSQL 17 on every push to `main` and on pull requests.
 
-A local development check also ran the integration suite against PostgreSQL compiled to WebAssembly through a wire-protocol test adapter. That adapter is not an application dependency or a production database substitute; GitHub's PostgreSQL service is the deployment-relevant integration target.
+## Project structure
 
-## Deploy
+```text
+apps/
+├── api/
+│   ├── migrations/       PostgreSQL schema and indexes
+│   └── src/
+│       ├── app.ts        Routes, middleware, and structured errors
+│       ├── auth.ts       Sessions and token rotation
+│       ├── repository.ts Scoped reads and shared queries
+│       ├── services.ts   Transactional business operations
+│       ├── realtime.ts   Private events and presence
+│       └── index.ts      API lifecycle and scheduler
+└── web/
+    └── src/
+        ├── pages/        Role-aware application screens
+        ├── api.ts        Requests and refresh coordination
+        ├── session.tsx   Auth, sockets, and reconnect catch-up
+        ├── forms.tsx     Entity editors
+        └── components.tsx Shared interface components
+docs/
+├── api.md
+├── architecture.md
+├── deployment.md
+└── submission-explanation.md
+```
 
-The repository contains a Vercel frontend configuration, an API Dockerfile, and an optional Render blueprint for a continuously running API and PostgreSQL database. **The hosting accounts and live deployment still need to be configured.** No application URL is claimed until deployment has been verified.
+## Deployment
 
-Follow [the deployment guide](docs/deployment.md). The chosen deployment uses a single persistent API instance so node-cron and process-local presence have well-defined ownership. Vercel's current WebSocket beta does support socket endpoints; this implementation does not rely on function instances staying alive or sharing in-memory state.
+The live application uses separate hosts for the concerns they handle best:
 
-## Deliberate boundaries
+- **Vercel** builds and serves the React frontend.
+- **Render** runs one persistent Dockerized API instance and PostgreSQL database.
+- **GitHub Actions** verifies formatting, builds, integration tests, and browser tests before delivery.
 
-- A single API process owns live delivery and presence. Multiple API replicas require a shared Socket.IO adapter and distributed presence before enabling horizontal scaling.
-- Due dates are whole UTC dates. A task becomes overdue after its due date ends, normally within one scheduler minute. Done tasks are excluded. Archived projects keep their historical tasks and counts.
-- A PM can select any active developer by name and an existing client by name/company when assigning work. They cannot browse another PM's projects, task data, activity, or client contact email. A team is defined by assignments within a PM's projects.
-- Reassigning a task immediately removes the former developer's access to that task, its history, and its notifications. History visibility follows current assignment.
-- Catch-up returns the latest 20 missed events. It is a bounded recovery window, not an export of every offline change. Cursors are stored per user/device; clearing browser storage starts with recent authorized history.
-- JWT sessions have a seven-day absolute lifetime. Password reset email, invitations, uploads, comments, and billing are outside this assessment's scope.
-- Notification lists show the most recent 50 visible entries; unread counts include older visible notifications. Read-all covers them too.
-- A committed change is durable even if live delivery fails. Reconnection and focus refresh reconcile database state; an outbox would make delivery retries durable.
+The root `vercel.json`, `Dockerfile`, and `render.yaml` contain the deployment configuration. See [docs/deployment.md](docs/deployment.md) for environment variables, cookie configuration, seeding, and live verification.
 
-See [the submission explanation](docs/submission-explanation.md) for a 150–250-word description of the main engineering trade-off.
+The public demonstration currently uses free hosting. The Render API can sleep when idle, and the free PostgreSQL instance has a limited lifetime; these constraints are hosting-tier limitations rather than application behavior.
+
+## Design boundaries
+
+- One API process owns real-time presence and scheduled jobs. Horizontal scaling requires a shared Socket.IO adapter and distributed presence state.
+- Due dates are whole UTC dates; incomplete tasks become overdue after the due date ends.
+- Catch-up intentionally returns a bounded recent window rather than acting as an activity export.
+- Password reset email, invitations, uploads, comments, and billing are outside the current product scope.
+- Notifications display the most recent visible entries while unread counts remain authoritative.
+
+## Documentation
+
+- [Architecture and data model](docs/architecture.md)
+- [API reference](docs/api.md)
+- [Deployment guide](docs/deployment.md)
+- [Engineering trade-off](docs/submission-explanation.md)
