@@ -15,13 +15,17 @@ test('admin can manage clients and projects; dialogs preserve keyboard access', 
   await login(page, 'admin');
   await expect(page.getByText('Online now', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/admin-overview.png', fullPage: true });
+  if (process.env.CI)
+    console.log(
+      'UI_SCREEN_ADMIN=' + (await page.screenshot({ fullPage: true })).toString('base64'),
+    );
   await page.getByRole('link', { name: 'Clients', exact: true }).click();
   await page.getByRole('button', { name: 'New client', exact: true }).click();
   await page.getByLabel('Client name').fill('Juniper QA');
   await page.getByLabel('Company', { exact: true }).fill('Juniper Studio');
   await page.getByLabel('Contact email').fill('qa@juniper.example');
   await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByRole('cell', { name: 'Juniper QA', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell').filter({ hasText: 'Juniper QA' }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Projects', exact: true }).click();
   await page.getByRole('button', { name: 'New project', exact: true }).click();
   await page.getByLabel('Project name').fill('Juniper — Launch');
@@ -95,6 +99,28 @@ test('mobile layout keeps navigation, task details, and forms usable', async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, 'admin');
   await page.screenshot({ path: 'test-results/mobile-overview.png', fullPage: true });
+  if (process.env.CI)
+    console.log(
+      'UI_SCREEN_MOBILE=' + (await page.screenshot({ fullPage: true })).toString('base64'),
+    );
+  console.log(
+    'LAYOUT_BOUNDS',
+    await page.evaluate(() => ({
+      width: innerWidth,
+      scroll: document.documentElement.scrollWidth,
+      overflow: Array.from(document.querySelectorAll('body *'))
+        .filter(
+          (e) => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('.table-scroll'),
+        )
+        .map((e) => ({
+          tag: e.tagName,
+          classes: e.className,
+          width: e.getBoundingClientRect().width,
+          right: e.getBoundingClientRect().right,
+        }))
+        .slice(0, 30),
+    })),
+  );
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

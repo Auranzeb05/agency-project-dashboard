@@ -130,7 +130,7 @@ function Login() {
   );
 }
 function Workspace() {
-  const { user, connected } = useSession();
+  const { user, connected, missed } = useSession();
   const [menu, setMenu] = useState(false),
     [taskId, setTaskId] = useState<number | null>(null),
     [newProject, setNewProject] = useState(false);
@@ -251,6 +251,14 @@ function Workspace() {
             <div className="offline-banner">
               <WifiOff size={16} />
               Live updates are reconnecting. Saved data is still available.
+            </div>
+          )}
+          {connected && missed > 0 && (
+            <div className="catchup-notice">
+              Caught up on the latest {missed} missed {missed === 1 ? 'update' : 'updates'}.{' '}
+              <Link to="/activity">
+                View activity <ArrowRight size={14} />
+              </Link>
             </div>
           )}
           <Routes>

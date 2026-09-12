@@ -77,7 +77,8 @@ apps/api/src/
   seed.ts          Repeatable initial fixture creation
 apps/api/migrations/  PostgreSQL schema and indexes
 apps/web/src/
-  App.tsx          Role-aware routes and working screens
+  App.tsx          Sign-in and role-aware application shell
+  pages/           Overview, projects, tasks, activity, and management screens
   api.ts           In-memory access token and refresh coordination
   session.tsx      Authentication state, sockets, and reconnect catch-up
   forms.tsx        Project, task, client, and user editors

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io } from 'socket.io-client';
 import { configureSession, currentToken, refreshSession, request } from './api';
-import type { Activity, User } from './types';
+import type { Activity, Notification, User } from './types';
 const SessionContext = createContext<{
   user: User | null;
   loading: boolean;
@@ -48,7 +48,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     let syncing = false,
       again = false;
-    const sync = async () => {
+    const sync = async (recovering = false) => {
       if (syncing) {
         again = true;
         return;
@@ -68,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           localStorage.setItem(`fieldwork:cursor:${user.id}`, result.cursor);
         } catch {}
-        if (cursor && result.items.length) setMissed(result.items.length);
+        if (recovering) setMissed(cursor ? result.items.length : 0);
         invalidate();
       } catch {
         /* Query views retain their own retry and error state. */
@@ -82,16 +82,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     socket.on('ready', () => {
       setConnected(true);
-      void sync();
+      void sync(true);
     });
     socket.on('activity', () => {
       void sync();
     });
     socket.on('invalidate', () => {
-      client.removeQueries({ queryKey: ['task'] });
+      void client.resetQueries({ queryKey: ['task'] });
+      void client.resetQueries({ queryKey: ['activity'] });
       invalidate();
     });
-    socket.on('notifications', () => {
+    socket.on('notifications', ({ unread }: { unread: number }) => {
+      client.setQueryData<{ items: Notification[]; unread: number }>(
+        ['notifications'],
+        (previous) => (previous ? { ...previous, unread } : previous),
+      );
       void client.invalidateQueries({ queryKey: ['notifications'] });
     });
     socket.on('presence', ({ count }: { count: number }) => setOnline(count));

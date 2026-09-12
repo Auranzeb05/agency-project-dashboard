@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { request } from './api';
@@ -18,8 +18,7 @@ import { labels, statuses, type Activity, type Status, type Task } from './types
 import { useStatusChange } from './pages/Tasks';
 
 export function TaskDetails({ taskId, onClose }: { taskId: number; onClose: () => void }) {
-  const { user } = useSession(),
-    client = useQueryClient();
+  const { user } = useSession();
   const [edit, setEdit] = useState(false);
   const closeEdit = useCallback(() => setEdit(false), []);
   const task = useQuery({
@@ -31,14 +30,17 @@ export function TaskDetails({ taskId, onClose }: { taskId: number; onClose: () =
     queryFn: () => request<{ items: Activity[] }>(`/activity?task_id=${taskId}`),
   });
   const update = useStatusChange();
+  if (task.error)
+    return (
+      <Modal title={`Task #${taskId}`} onClose={onClose}>
+        <ErrorNotice error={task.error} />
+      </Modal>
+    );
   if (edit && task.data)
     return <TaskEditor projectId={task.data.project_id} task={task.data} onClose={closeEdit} />;
   return (
     <Modal title={`Task #${taskId}`} onClose={onClose} wide>
-      <ErrorNotice
-        error={task.error || update.error}
-        retry={task.error ? () => void task.refetch() : undefined}
-      />
+      <ErrorNotice error={task.error || update.error} retry={() => void task.refetch()} />
       {task.isPending ? (
         <Loading />
       ) : (
